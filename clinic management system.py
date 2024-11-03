@@ -1,196 +1,204 @@
-import tkinter as tk  # Import the tkinter library for GUI
-import tkinter.ttk as ttk  # Import the themed tkinter widgets
-from PIL import Image, ImageTk  # Import Pillow for image handling
-import os  # Import os for file path operations
-import csv  # Import csv for handling CSV files
-from collections import deque  # Import deque for efficient queue operations
-from datetime import date  # Import date for handling date-related operations
+import mysql.connector
+import tkinter as tk
+import tkinter.ttk as ttk
+from PIL import Image, ImageTk
+from collections import deque
+from datetime import date
 
-queue = deque()  # Initialize a deque to manage the injured person's queue
+# Connect to the MySQL database
+mydb = mysql.connector.connect(
+    host='localhost',
+    user='root',
+    password='*********',
+    database='clinic_management'
+)
 
+# Create a cursor for executing SQL commands
+my_cursor = mydb.cursor()
+
+# Create table if it doesn't exist
+my_cursor.execute("create table if not exists consultants (consultantID int AUTO_INCREMENT, Nom_et_Prenom varchar(255) not null ,CIN varchar(255) not null , Age int not null, Telephone varchar(255) not null, Consultation varchar(255) not null, Adresse varchar(255) not null, Traitement varchar(255) not null, Diagnostic varchar(255) not null, Date_de_Consultation date not null, Tarif int not null, primary key(consultantID))")
+
+# Queue to store consultant information
+queue = deque()
+
+# Function to add a new injury record to the queue
 def add_injury_info():
-    # Function to add injury information to a CSV file and queue
-    path = 'C:\\Users\\dell\\Desktop\\management.csv'  # Specify the CSV file path
-    injury_info = full_name.get()  # Get the full name from the entry field
-    type_of_injury = injury_type.get()  # Get the type of injury from the entry field
-    date_cunsultation = date.today()  # Get the current date
-    queue.append(injury_info)  # Add the injured person's name to the queue
-    if not os.path.exists(path):  # Check if the file does not exist
-        headers = ['FullName', 'Injury', 'date', 'ConsultationFee']  # Define headers for the CSV
-        with open(path, mode='w', newline='') as csvfile:  # Open the file for writing
-            writer = csv.writer(csvfile)  # Create a CSV writer object
-            writer.writerow(headers)  # Write the headers to the CSV file
-    with open(path, mode='a', newline='') as csvfile:  # Open the file for appending
-        writer = csv.writer(csvfile)  # Create a CSV writer object
-        writer.writerow([injury_info, type_of_injury, date_cunsultation, ''])  # Write the injury info
+    injury_info = full_name.get()
+    phone_number = telephone_number.get()
+    type_of_injury = injury_type.get()
+    date_cunsultation = date.today()
+    
+    # Append consultant info as a tuple
+    consultant_info = [('FullName', injury_info), ('TelephoneNumber', phone_number), 
+                       ('InjuryType', type_of_injury), ('ConsultationDate', date_cunsultation)]
+    queue.append(consultant_info)
 
+# Function to move to the next injury in the queue
 def next():
-    # Function to handle the next injured person in line
-    absent_injured = queue.popleft()  # Remove the first person from the queue
-    path = 'C:\\Users\\dell\\Desktop\\management.csv'  # Specify the CSV file path
-    rows = []  # Initialize a list to hold the rows of the CSV
-    with open(path, mode='r', newline='') as csvfile:  # Open the CSV file for reading
-        reader = csv.reader(csvfile)  # Create a CSV reader object
-        rows = list(reader)  # Read all rows into a list
-    rows.remove(['FullName', 'Injury', 'date', 'ConsultationFee'])  # Remove the header row
-    for row in rows:  # Iterate over the rows to find the absent injured
-        if absent_injured in row:  # Check if the absent injured's name is in the row
-            rows.remove(row)  # Remove the corresponding row
-            if len(queue) == 0:  # Check if the queue is empty
-                next_injury = 'no one'  # Set next injured to 'no one'
-            else:
-                next_injury = queue[0]  # Get the next person in the queue
-            popup2 = tk.Toplevel(background='#33ff33')  # Create a popup window
-            popup2.geometry('300x100+1000+140')  # Set the popup window size and position
-            popup2.title('next injured')  # Set the title of the popup
-            notification = tk.Label(popup2, text=f"'{next_injury}' is next", background='#33ff33', font=('Arial', 11, 'bold'), fg='#003300')  # Create a label with the notification
-            notification.pack()  # Pack the label into the popup
-            popup2.after(5000, popup2.destroy)  # Destroy the popup after 5 seconds
-    headers = ['FullName', 'Injury', 'date', 'ConsultationFee']  # Define headers for the CSV
-    with open(path, mode='w', newline='') as csvfile:  # Open the CSV file for writing
-        writer = csv.DictWriter(csvfile, fieldnames=headers)  # Create a CSV DictWriter
-        writer.writeheader()  # Write the headers to the CSV file
-        for row in rows:  # Write the remaining rows back to the CSV
-            writer.writerow({'FullName': row[0], 'Injury': row[1], 'date': row[2], 'ConsultationFee': row[3]})
+    absent_injured = queue.popleft()[0][1]  # Remove the first item
+    next_injury = 'no one' if len(queue) == 0 else queue[0][0][1]  # Check next injured person
 
+    # Show popup with the next person in the queue
+    popup2 = tk.Toplevel(background='#33ff33')
+    popup2.geometry('300x100+1000+140')
+    popup2.title('Next Injured')
+    notification = tk.Label(
+        popup2, text=f"'{next_injury}' is next",
+        background='#33ff33', font=('Arial', 11, 'bold'), fg='#003300'
+    )
+    notification.pack()
+    popup2.after(5000, popup2.destroy)  # Destroy after 5 seconds
+
+# Function to process payment and save consultant info to the database
 def pay_consultation_fee():
-    # Function to process the payment of consultation fees
-    path = 'C:\\Users\\dell\\Desktop\\management.csv'  # Specify the CSV file path
-    consultation_fee = consultation_price.get()  # Get the consultation fee from the entry field
-    rows = []  # Initialize a list to hold the rows of the CSV
-    with open(path, mode='r', newline='') as csvfile:  # Open the CSV file for reading
-        reader = csv.reader(csvfile)  # Create a CSV reader object
-        rows = list(reader)  # Read all rows into a list
-    rows.remove(['FullName', 'Injury', 'date', 'ConsultationFee'])  # Remove the header row
-    for row in rows:  # Iterate over the rows to find the empty consultation fee
-        if len(row) <= 4 and row[3] == '':  # Check if the consultation fee is empty
-            row[3] = consultation_fee  # Assign the consultation fee to the row
-            break  # Exit the loop after updating the fee
-    headers = ['FullName', 'Injury', 'date', 'ConsultationFee']  # Define headers for the CSV
-    with open(path, mode='w', newline='') as csvfile:  # Open the CSV file for writing
-        writer = csv.DictWriter(csvfile, fieldnames=headers)  # Create a CSV DictWriter
-        writer.writeheader()  # Write the headers to the CSV file
-        for row in rows:  # Write the updated rows back to the CSV
-            writer.writerow({'FullName': row[0], 'Injury': row[1], 'date': row[2], 'ConsultationFee': row[3]})
-    queue.popleft()  # Remove the first person from the queue
-    if len(queue) == 0:  # Check if the queue is empty
-        next_injury = 'no one'  # Set next injured to 'no one'
-    else:
-        next_injury = queue[0]  # Get the next person in the queue
-    popup1 = tk.Toplevel(background='#33ff33')  # Create a popup window
-    popup1.geometry('300x100+1000+140')  # Set the popup window size and position
-    popup1.title('next injured')  # Set the title of the popup
-    notification = tk.Label(popup1, text=f"'{next_injury}' is next", background='#33ff33', font=('Arial', 11, 'bold'), fg='#003300')  # Create a label with the notification
-    notification.pack()  # Pack the label into the popup
-    popup1.after(5000, popup1.destroy)  # Destroy the popup after 5 seconds
+    consultant = queue.popleft()  # Remove the next consultant
+    consultation_fee = int(consultation_price.get())
+    FullName, TelephoneNumber, InjuryType, ConsultationDate = consultant
 
-def show_list_injured():
-    # Function to display the list of injured persons in a treeview
-    path = 'C:\\Users\\dell\\Desktop\\management.csv'  # Specify the CSV file path
-    with open(path, 'r') as csvfile:  # Open the CSV file for reading
-        reader = csv.DictReader(csvfile)  # Create a CSV DictReader
-        data = list(reader)  # Read all data into a list
-    columns = ("#1", "#2", "#3", "#4")  # Define the column numbers for the treeview
-    tree = ttk.Treeview(list_frame, columns=columns, show="headings")  # Create a treeview for displaying data
-    fieldnames = ['FullName', 'Injury', 'date', 'ConsultationFee']  # Define column names
-    for i in range(1, 5):  # Set the column headings and widths
-        tree.heading(f"#{i}", text=f"{fieldnames[i-1]}")  # Set the heading for each column
-        tree.column(f"#{i}", width=220)  # Set the width for each column
+    # Insert consultant details into the database
+    sql = ('INSERT INTO consultants (FullName, TelephoneNumber, InjuryType, '
+           'ConsultationDate, ConsultationFee) VALUES (%s, %s, %s, %s, %s)')
+    val = (FullName[1], TelephoneNumber[1], InjuryType[1], ConsultationDate[1], consultation_fee)
+    my_cursor.execute(sql, val)
+    mydb.commit()
 
-    tree['style'] = 'Treeview'  # Set the style for the treeview
-    style = ttk.Style()  # Create a style object for the treeview
-    style.configure('Treeview', rowheight=25, background='#80bfff', foreground='black', font=('Arial', 10, 'bold'))  # Configure treeview style
-    style.map('Treeview', background=[('selected', '#ff33ff')], foreground=[('selected', 'black')])  # Set selection colors
+    # Update the next injured person display
+    next_injury = 'no one' if len(queue) == 0 else queue[0][0][1]
+    popup2 = tk.Toplevel(background='#33ff33')
+    popup2.geometry('300x100+1000+140')
+    popup2.title('Next Injured')
+    notification = tk.Label(
+        popup2, text=f"'{next_injury}' is next",
+        background='#33ff33', font=('Arial', 11, 'bold'), fg='#003300'
+    )
+    notification.pack()
+    popup2.after(5000, popup2.destroy)
 
-    for d in data:  # Iterate through the data to insert into the treeview
-        tree.insert("", "end", values=(f"{d['FullName']}", f"{d['Injury']}", f"{d['date']}", f"{d['ConsultationFee']}"))  # Insert each row into the treeview
-
-    scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)  # Create a vertical scrollbar for the treeview
-    tree.configure(yscroll=scrollbar.set)  # Link the scrollbar to the treeview
-    tree.grid(row=0, column=0, sticky="nsew")  # Position the treeview in the grid
-    scrollbar.grid(row=0, column=1, sticky="ns")  # Position the scrollbar in the grid
-
+# Function to display the total fees collected for today
 def sum_of_fee():
-    # Function to calculate and display the total consultation fee for today
-    path = 'C:\\Users\\dell\\Desktop\\management.csv'  # Specify the CSV file path
-    consultation_fee = []  # Initialize a list to store consultation fees
-    date_cunsultation = date.today()  # Get today's date
-    with open(path, mode='r', newline='') as csvfile:  # Open the CSV file for reading
-        reader = csv.DictReader(csvfile)  # Create a CSV DictReader
-        for row in reader:  # Iterate over the rows to find today's consultation fees
-            if row['date'] == str(date_cunsultation):  # Check if the date matches today
-                consultation_fee.append(row['ConsultationFee'])  # Add the fee to the list
-    consultation_fees = [int(num) for num in consultation_fee if num.isdigit()]  # Convert fees to integers
-    popup = tk.Toplevel(background='#33ff33')  # Create a popup window
-    popup.geometry('300x100+1000+0')  # Set the popup window size and position
-    popup.title('Total consultation fee')  # Set the title of the popup
-    notification = tk.Label(popup, text=f'total fee of today is: {sum(consultation_fees)}', background='#33ff33', font=('Arial', 11, 'bold'), fg='#003300')  # Create a label with the total fee
-    notification.pack()  # Pack the label into the popup
-    popup.after(5000, popup.destroy)  # Destroy the popup after 5 seconds
+    sql = 'SELECT SUM(ConsultationFee) FROM consultants WHERE ConsultationDate = CURRENT_DATE()'
+    my_cursor.execute(sql)
+    myresult = my_cursor.fetchall()
 
-window = tk.Tk()  # Create the main application window
-window.title("Injured Management")  # Set the window title
-window.geometry("900x600")  # Set the window size
-window.resizable()  # Allow the window to be resizable
+    # Display the total fee in a popup
+    popup2 = tk.Toplevel(background='#33ff33')
+    popup2.geometry('300x100+1000+140')
+    popup2.title('Total Fee for Today')
+    notification = tk.Label(
+        popup2, text=f"The total fee of today is: {int(myresult[0][0])}",
+        background='#33ff33', font=('Arial', 11, 'bold'), fg='#003300'
+    )
+    notification.pack()
+    popup2.after(5000, popup2.destroy)
 
-# Load and resize the background image
-background_image = Image.open("C:\\Users\\dell\\Desktop\\—Pngtree—a doctor in white coat.png")  # Specify the path for the background image
-background_image = background_image.resize((900, 600), Image.LANCZOS)  # Resize the image
-background_photo = ImageTk.PhotoImage(background_image)  # Convert the image for tkinter usage
+# Function to display the list of all injured persons in the table
+def show_list_injured():
+    sql = 'SELECT FullName, TelephoneNumber, InjuryType, ConsultationDate, ConsultationFee FROM consultants'
+    my_cursor.execute(sql)
+    myresult = my_cursor.fetchall()
 
-# Create a canvas to hold the background image
-canvas = tk.Canvas(window, width=window.winfo_screenwidth(), height=window.winfo_screenheight())
-canvas.pack(fill="both", expand=True)  # Fill the window with the canvas
-canvas.create_image(0, 0, image=background_photo, anchor="nw")  # Place the background image
+    # Define table structure and styles
+    columns = ("#1", "#2", "#3", "#4", "#5")
+    tree = ttk.Treeview(list_frame, columns=columns, height=5, show="headings")
+    fieldnames = ['Full Name', 'Telephone Number', 'Injury Type', 'Consultation Date', 'Consultation Fee']
+    
+    for i in range(1, 6):
+        tree.heading(f"#{i}", text=f"{fieldnames[i-1]}", anchor='w')
+        tree.column(f"#{i}", width=269)
 
-# Create lines on the canvas for visual separation
-line1 = canvas.create_line(0, 120, 900, 120, fill='black', width=1)
-line2 = canvas.create_line(0, 200, 900, 200, fill='black', width=1)
-canvas.tag_raise(line1)  # Raise the first line above the image
-canvas.tag_raise(line2)  # Raise the second line above the image
+    # Apply styling to the table
+    style = ttk.Style()
+    style.configure('Treeview', rowheight=29, background='#80bfff', foreground='black', font=('Arial', 10, 'bold'))
+    style.map('Treeview', background=[('selected', '#ff33ff')], foreground=[('selected', 'black')])
 
-# Create labels and entry fields for user input
-full_name_label = tk.Label(canvas, text='Full Name            ', font=('Arial', 10, 'bold'), fg='#800080')  # Label for full name
-full_name_label.grid(row=0, column=0, sticky='nsew', padx=(130, 27), pady=(20, 0))  # Position the label
-full_name = tk.Entry(canvas, width=30, background='#eeffcc')  # Entry field for full name
-full_name.insert(0, ' insert the full name')  # Placeholder text
-full_name.bind("<FocusIn>", lambda e: full_name.delete('0', 'end'))  # Clear placeholder on focus
-full_name.grid(row=0, column=1, sticky='nsew', padx=(63, 100), pady=(20, 0))  # Position the entry
+    # Insert data into the table
+    for data in myresult:
+        tree.insert("", "end", values=(data[0], data[1], data[2], data[3], data[4]))
 
-injury_type_label = tk.Label(canvas, text='Injury type           ', font=('Arial', 10, 'bold'), fg='#800080')  # Label for injury type
-injury_type_label.grid(row=1, column=0, sticky='nsew', padx=(130, 27), pady=20)  # Position the label
-injury_type = tk.Entry(canvas, width=30, background='#eeffcc')  # Entry field for injury type
-injury_type.insert(0, ' insert the injury type')  # Placeholder text
-injury_type.bind("<FocusIn>", lambda e: injury_type.delete('0', 'end'))  # Clear placeholder on focus
-injury_type.grid(row=1, column=1, sticky='nsew', padx=(63, 100), pady=20)  # Position the entry
+    # Add vertical scrollbar
+    scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
+    tree.configure(yscroll=scrollbar.set)
+    tree.grid(row=0, column=0, sticky="nsew")
+    scrollbar.grid(row=0, column=1, sticky="ns")
 
-# Create buttons for actions
-add_button = tk.Button(canvas, text='add', command=add_injury_info, width=15, background='#3385ff', font=('Arial', 10, 'bold'), border=1)  # Button to add injury info
-add_button.grid(row=1, column=2, sticky='nsew', padx=(27, 5), pady=20)  # Position the button
+# Initialize the main window
+window = tk.Tk()
+window.title("Injured Management")
+screen_width = window.winfo_screenwidth()
+screen_height = window.winfo_screenheight()
+window.geometry(f"{screen_width}x{screen_height}")
 
-consultation_label = tk.Label(canvas, text='Consultation Fee', font=('Arial', 10, 'bold'), fg='#800080')  # Label for consultation fee
-consultation_label.grid(row=2, column=0, sticky='nsew', padx=(130, 27), pady=40)  # Position the label
-consultation_price = tk.Entry(canvas, width=30, background='#eeffcc')  # Entry field for consultation fee
-consultation_price.insert(0, ' insert the consultation fee')  # Placeholder text
-consultation_price.bind("<FocusIn>", lambda e: consultation_price.delete('0', 'end'))  # Clear placeholder on focus
-consultation_price.grid(row=2, column=1, sticky='nsew', padx=(63, 100), pady=40)  # Position the entry
+# Load and set the background image
+background_image = Image.open("C:\\Users\\dell\\Desktop\\—Pngtree—a doctor in white coat.png")
+background_image = background_image.resize((screen_width, screen_height), Image.LANCZOS)
+background_photo = ImageTk.PhotoImage(background_image)
 
-pay_button = tk.Button(canvas, text='payed', command=pay_consultation_fee, width=15, background='#00ff00', font=('Arial', 10, 'bold'), border=1)  # Button to pay consultation fee
-pay_button.grid(row=2, column=2, sticky='nsew', padx=(27, 5), pady=40)  # Position the button
+# Create canvas and display the background
+canvas = tk.Canvas(window, width=screen_width, height=screen_height)
+canvas.pack(fill="both", expand=True)
+canvas.create_image(0, 0, image=background_photo, anchor="nw")
 
-pass_button = tk.Button(canvas, text='pass', command=next, width=15, background='#00ffcc', font=('Arial', 10, 'bold'), border=1)  # Button to skip to the next injured person
-pass_button.grid(row=3, column=2, sticky='nsew', padx=(27, 5), pady=10)  # Position the button
+# Draw lines on the canvas
+line1 = canvas.create_line(0, 180, screen_width, 180, fill='black', width=1)
+line2 = canvas.create_line(0, 270, screen_width, 270, fill='black', width=1)
+canvas.tag_raise(line1)
+canvas.tag_raise(line2)
 
-total_fee_button = tk.Button(canvas, text='total fee', command=sum_of_fee, width=15, background='#66ccff', font=('Arial', 10, 'bold'), border=1)  # Button to calculate total fees
-total_fee_button.grid(row=4, column=2, sticky='nsew', padx=(27, 5))  # Position the button
+# Set up input fields and buttons
+full_name_label = tk.Label(canvas, text='Full Name            ', font=('Arial', 10, 'bold'), fg='#800080')
+full_name_label.grid(row=0, column=0, sticky='nsew', padx=(130, 27), pady=(20, 0))
+full_name = tk.Entry(canvas, width=30, background='#eeffcc')
+full_name.insert(0, ' insert the full name')
+full_name.bind("<FocusIn>", lambda e: full_name.delete('0', 'end'))
+full_name.grid(row=0, column=1, sticky='nsew', padx=(63, 100), pady=(20, 0))
 
-show_button = tk.Button(canvas, text='show data', command=show_list_injured, width=15, background='#ff33ff', font=('Arial', 10, 'bold'), border=1)  # Button to show the list of injured persons
-show_button.grid(row=5, column=2, sticky='nsew', padx=(27, 5), pady=10)  # Position the button
+injury_type_label = tk.Label(canvas, text='Injury type           ', font=('Arial', 10, 'bold'), fg='#800080')
+injury_type_label.grid(row=1, column=0, sticky='nsew', padx=(130, 27), pady=20)
+injury_type = tk.Entry(canvas, width=30, background='#eeffcc')
+injury_type.insert(0, ' insert the injury type')
+injury_type.bind("<FocusIn>", lambda e: injury_type.delete('0', 'end'))
+injury_type.grid(row=1, column=1, sticky='nsew', padx=(63, 100), pady=20)
 
-# Create a frame to display the list of injured persons
-list_frame = tk.LabelFrame(window, text='The injured list', background='#80bfff', fg='#800080', highlightbackground='#800080', border=1, width=900, height=300, relief="solid", font=('Arial', 11, 'bold'))
-list_frame.pack(side=('left'))  # Pack the frame to the left side of the window
+telephone_number_label = tk.Label(canvas, text='Telephone Number', font=('Arial', 10, 'bold'), fg='#800080')
+telephone_number_label.grid(row=2, column=0, sticky='nsew', padx=(130, 27), pady=20)
+telephone_number = tk.Entry(canvas, width=30, background='#eeffcc')
+telephone_number.insert(0, ' insert the telephone number')
+telephone_number.bind("<FocusIn>", lambda e: telephone_number.delete('0', 'end'))
+telephone_number.grid(row=2, column=1, sticky='nsew', padx=(63, 100), pady=20)
 
-window.rowconfigure(4, weight=1)  # Configure the grid weight for proper resizing
+# Add buttons for different actions
+add_button = tk.Button(canvas, text='Add', command=add_injury_info, width=15, background='#3385ff', font=('Arial', 10, 'bold'), border=1)
+add_button.grid(row=2, column=2, sticky='nsew', padx=(27, 5), pady=20)
 
-window.mainloop()  # Start the main event loop
+consultation_label = tk.Label(canvas, text='Consultation Fee', font=('Arial', 10, 'bold'), fg='#800080')
+consultation_label.grid(row=3, column=0, sticky='nsew', padx=(130, 27), pady=40)
+consultation_price = tk.Entry(canvas, width=30, background='#eeffcc')
+consultation_price.insert(0, ' insert the consultation fee')
+consultation_price.bind("<FocusIn>", lambda e: consultation_price.delete('0', 'end'))
+consultation_price.grid(row=3, column=1, sticky='nsew', padx=(63, 100), pady=40)
+
+pay_button = tk.Button(canvas, text='Paid', command=pay_consultation_fee, width=15, background='#00ff00', font=('Arial', 10, 'bold'), border=1)
+pay_button.grid(row=3, column=2, sticky='nsew', padx=(27, 5), pady=40)
+
+pass_button = tk.Button(canvas, text='Pass', command=next, width=15, background='#00ffcc', font=('Arial', 10, 'bold'), border=1)
+pass_button.grid(row=4, column=2, sticky='nsew', padx=(27, 5), pady=10)
+
+total_fee_button = tk.Button(canvas, text='Total Fee', command=sum_of_fee, width=15, background='#66ccff', font=('Arial', 10, 'bold'), border=1)
+total_fee_button.grid(row=5, column=2, sticky='nsew', padx=(27, 5))
+
+show_button = tk.Button(canvas, text='Show Data', command=show_list_injured, width=15, background='#ff33ff', font=('Arial', 10, 'bold'), border=1)
+show_button.grid(row=6, column=2, sticky='nsew', padx=(27, 5), pady=10)
+
+# Frame to display the list of injured persons
+list_frame = tk.LabelFrame(window, text='The Injured List', background='#80bfff', fg='#800080', highlightbackground='#800080', border=1, width=900, relief="solid", font=('Arial', 11, 'bold'))
+list_frame.pack(side='left')
+
+# Set row configuration for the main window
+window.rowconfigure(4, weight=1)
+
+# Display the list of injured persons on launch
+show_list_injured()
+
+# Start the main application loop
+window.mainloop()
