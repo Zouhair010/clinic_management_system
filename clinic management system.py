@@ -284,11 +284,11 @@ screen_height = window.winfo_screenheight()
 window.geometry(f"{screen_width}x{screen_height}")
 
 # Change the default icon of the application window
-window.iconbitmap("C:\\Users\\dell\\Desktop\\medical-15_icon-icons.com_73938.ico") #to change the default icon
+window.iconbitmap("C:\\Users\\dell\\Desktop\\project2\\medical-15_icon-icons.com_73938.ico") #to change the default icon
 # window.resizable(False, False)
 
 # Get the screen dimensions for full-screen display
-background_image = Image.open("C:\\Users\\dell\\Desktop\\—Pngtree—a doctor in white coat_156802721.png") 
+background_image = Image.open("C:\\Users\\dell\\Desktop\\project2\\—Pngtree—a doctor in white coat.png") 
 background_image = background_image.resize((screen_width, screen_height), Image.LANCZOS)   # Resize to fit screen
 background_photo = ImageTk.PhotoImage(background_image) # Create a PhotoImage object for tkinter
 
